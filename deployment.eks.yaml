@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: datastream
+  namespace: api
+  labels:
+    app: datastream
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: datastream
+  template:
+    metadata:
+      labels:
+        app: datastream
+    spec:
+      serviceAccountName: <project>-<build>-api
+      restartPolicy: Always
+      containers:
+        - name: datastream
+          image: <account>.dkr.ecr.<region>.amazonaws.com/proto/datastream:latest
+          ports:
+            - containerPort: 8080
+          env:
+          - name: INFRA
+            value: aws-eks/production
+          - name: AWS_REGION
+            value: us-west-2
+          - name: WIKIMEDIA_API_USER_AGENT
+            value: eks/msk-ingestion <you@email.com>
+          - name: LOKI_ENDPOINT
+            value: http://default-opentelemetry-collector.o11y.svc.cluster.local:3500
+          - name: OTLP_HTTP_ENDPOINT
+            value: http://default-opentelemetry-collector.o11y.svc.cluster.local:4318
+          - name: OTLP_ZIPKIN_ENDPOINT
+            value: http://default-opentelemetry-collector.o11y.svc.cluster.local:9411
+          - name: KAFKA_URL
+            value: <https://kafka:9092>
+          - name: KAFKA_SECURITY_PROTOCOL
+            value: SASL_SSL
+          - name: KAFKA_SASL_MECHANISM
+            value: AWS_MSK_IAM
+          - name: KAFKA_JAAS_CONFIG
+            value: software.amazon.msk.auth.iam.IAMLoginModule required;
+          - name: KAFKA_SASL_CALLBACK_HANDLER
+            value: software.amazon.msk.auth.iam.IAMClientCallbackHandler
+          - name: KAFKA_TOPIC_PARTITIONS
+            value: "3"
+          - name: KAFKA_TOPIC_REPLICAS
+            value: "2"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: datastream
+  name: datastream
+  namespace: api
+spec:
+  ports:
+    - name: 'http'
+      port: 8080
+      targetPort: 8080
+  selector:
+    app: datastream
+  type: ClusterIP
